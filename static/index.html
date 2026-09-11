@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Италиански Картички с AI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { color: #7f8c8d; margin-bottom: 25px; }
+
+        .controls {
+            margin-bottom: 30px;
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            padding: 12px 18px;
+            font-size: 16px;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            outline: none;
+            width: 250px;
+        }
+
+        button.gen-btn {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        button.gen-btn:hover { background-color: #2980b9; }
+
+        .section-title {
+            width: 100%;
+            max-width: 900px;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            color: #34495e;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Container за картички */
+        .cards-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+            max-width: 950px;
+            margin-bottom: 20px;
+        }
+
+        /* 3D Flip Card Ефекти */
+        .card {
+            background-color: transparent;
+            width: 290px;
+            height: 260px;
+            perspective: 1000px;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+            border-radius: 14px;
+        }
+
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 14px;
+            padding: 15px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-front {
+            background-color: #ffffff;
+            color: #2c3e50;
+            border: 2px solid #e0e0e0;
+        }
+
+        .card-back {
+            background-color: #2ecc71;
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        /* Стил за бутоните с отговори (Ниво 1) */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .option-btn {
+            padding: 8px 10px;
+            font-size: 14px;
+            background-color: #f8f9fa;
+            border: 1.5px solid #bdc3c7;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .option-btn:hover {
+            background-color: #e8f4f8;
+            border-color: #3498db;
+        }
+
+        .option-btn.correct {
+            background-color: #2ecc71 !important;
+            color: white !important;
+            border-color: #27ae60 !important;
+        }
+
+        .option-btn.wrong {
+            background-color: #e74c3c !important;
+            color: white !important;
+            border-color: #c0392b !important;
+        }
+
+        .translation {
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+
+        .explanation {
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .loading {
+            display: none;
+            font-size: 18px;
+            color: #e67e22;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .hint {
+            font-size: 0.8em;
+            color: #bdc3c7;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🇮🇹 ItaliAIn Flashcards</h1>
+    <div class="subtitle">Учи италиански неправилни глаголи с генератор на AI картички</div>
+
+    <div class="controls">
+        <input type="text" id="verbInput" placeholder="Въведи глагол (напр. fare, venire)">
+        <button class="gen-btn" onclick="generateCards()">Генерирай</button>
+    </div>
+
+    <div id="loading" class="loading">⏳ Gemini генерира нови картички...</div>
+
+    <!-- НИВО 1 -->
+    <h2 class="section-title">🎯 Ниво 1: Тест с избор на отговор</h2>
+    <div class="cards-container" id="quizContainer"></div>
+
+    <!-- НИВО 2 -->
+    <h2 class="section-title">🎴 Ниво 2: Класически картички (Самопроверка)</h2>
+    <div class="cards-container" id="classicContainer"></div>
+
+    <script>
+        // Проверка на отговора в Ниво 1
+        function checkAnswer(btn, selectedOption, correctAnswer, cardId) {
+            const parentFront = btn.closest('.card-front');
+            const allButtons = parentFront.querySelectorAll('.option-btn');
+            
+            // Блокираме повторно кликане
+            allButtons.forEach(b => b.disabled = true);
+
+            if (selectedOption === correctAnswer) {
+                btn.classList.add('correct');
+            } else {
+                btn.classList.add('wrong');
+                // Показваме кой беше верният
+                allButtons.forEach(b => {
+                    if (b.innerText === correctAnswer) b.classList.add('correct');
+                });
+            }
+
+            // Обръщаме картичката автоматично след 1 секунда, за да види обяснението
+            setTimeout(() => {
+                const card = document.getElementById(cardId);
+                card.classList.add('flipped');
+            }, 1000);
+        }
+
+        // Ръчно обръщане за Ниво 2
+        function flipCard(cardElement) {
+            cardElement.classList.toggle('flipped');
+        }
+
+        // Рендериране на картичките
+        function renderCards(cards) {
+            const quizContainer = document.getElementById('quizContainer');
+            const classicContainer = document.getElementById('classicContainer');
+
+            quizContainer.innerHTML = '';
+            classicContainer.innerHTML = '';
+
+            cards.forEach((card, index) => {
+                const cardIdQuiz = `quiz-card-${index}`;
+                const cardIdClassic = `classic-card-${index}`;
+
+                // --- 1. Генерация за НИВО 1 (Тест с бутони) ---
+                let optionsHtml = '';
+                if (card.options && card.options.length > 0) {
+                    optionsHtml = '<div class="options-grid">';
+                    card.options.forEach(opt => {
+                        optionsHtml += `
+                            <button class="option-btn" onclick="checkAnswer(this, '${opt}', '${card.back}', '${cardIdQuiz}')">
+                                ${opt}
+                            </button>
+                        `;
+                    });
+                    optionsHtml += '</div>';
+                }
+
+                const quizCardHtml = `
+                    <div class="card" id="${cardIdQuiz}">
+                        <div class="card-inner">
+                            <div class="card-front">
+                                <div>
+                                    <h3 style="margin:5px 0;">${card.front}</h3>
+                                    <div class="translation">🇧🇬 ${card.translation_bg}</div>
+                                </div>
+                                ${optionsHtml}
+                                <div class="hint">Избери отговор, за да видиш обяснението</div>
+                            </div>
+                            <div class="card-back" onclick="flipCard(document.getElementById('${cardIdQuiz}'))" style="cursor:pointer;">
+                                <h2>${card.back}</h2>
+                                <div class="explanation">${card.explanation}</div>
+                                <div class="hint" style="color:white;">(Кликни за връщане)</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                quizContainer.innerHTML += quizCardHtml;
+
+                // --- 2. Генерация за НИВО 2 (Класически картички) ---
+                const classicCardHtml = `
+                    <div class="card" id="${cardIdClassic}" onclick="flipCard(this)" style="cursor:pointer;">
+                        <div class="card-inner">
+                            <div class="card-front">
+                                <h3>${card.front}</h3>
+                                <div class="translation">🇧🇬 ${card.translation_bg}</div>
+                                <div class="hint">(Кликни за отговор)</div>
+                            </div>
+                            <div class="card-back">
+                                <h2>${card.back}</h2>
+                                <div class="explanation">${card.explanation}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                classicContainer.innerHTML += classicCardHtml;
+            });
+        }
+
+        // Заявка към FastAPI за нови картички
+        async function generateCards() {
+            const verb = document.getElementById('verbInput').value.strip ? document.getElementById('verbInput').value.strip() : document.getElementById('verbInput').value.trim();
+            const loading = document.getElementById('loading');
+            
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ verb: verb || 'andare' })
+                });
+
+                const data = await response.json();
+                loading.style.display = 'none';
+
+                if (data.cards) {
+                    renderCards(data.cards);
+                }
+            } catch (err) {
+                loading.style.display = 'none';
+                alert('Възникна грешка при връзката със сървъра.');
+            }
+        }
+
+        // Зареждане на съществуващи картички при отваряне
+        async function loadExistingCards() {
+            try {
+                const response = await fetch('/api/cards');
+                const cards = await response.json();
+                if (cards.length > 0) {
+                    renderCards(cards);
+                }
+            } catch (err) {
+                console.log('Няма предишни картички.');
+            }
+        }
+
+        loadExistingCards();
+    </script>
+</body>
+</html>
